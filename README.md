@@ -159,16 +159,22 @@ rknn.load_rknn('models/yolov5_ball_classifier_int8.rknn')
 rknn.init_runtime()
 
 # Preprocess (NHWC format for RKNN!)
+# NOTE: Do NOT normalize (/255) — the RKNN model handles normalization
+# internally via std_values=[255,255,255] set during conversion.
 img = cv2.imread("test.jpg")
 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 img = cv2.resize(img, (640, 640))
-img = (img.astype(np.float32) / 255.0)
-img = np.expand_dims(img, 0)  # (1, 640, 640, 3) NHWC
+img = np.expand_dims(img, 0).astype(np.float32)  # (1, 640, 640, 3) NHWC
 
 # Run inference
-detection, classification = rknn.inference(inputs=[img])
+outputs = rknn.inference(inputs=[img])
 
-# Get prediction
+# Inspect outputs (first run — verify which index is classification)
+for i, out in enumerate(outputs):
+    print(f"Output[{i}] shape: {out.shape}")
+
+# Classification output (index may vary — check shapes above)
+classification = outputs[-1]  # typically last output
 class_names = ['Basketball', 'Football', 'Tennis Ball']
 predicted_class = int(np.argmax(classification))
 print(f"Detected: {class_names[predicted_class]}")
@@ -176,7 +182,10 @@ print(f"Detected: {class_names[predicted_class]}")
 rknn.release()
 ```
 
-**Note**: RKNN uses **NHWC** format (batch, height, width, channels), while PyTorch/ONNX use **NCHW**.
+**Notes**:
+- RKNN uses **NHWC** format `(1, 640, 640, 3)`, while PyTorch/ONNX use **NCHW** `(1, 3, 640, 640)`
+- Do **NOT** normalize input (`/255.0`) — the RKNN model handles this internally (configured with `std_values=[255,255,255]` during conversion)
+- On first run, check the printed output shapes to confirm which index is detection vs classification
 
 </details>
 
